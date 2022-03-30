@@ -31,7 +31,7 @@ FILTERS může být kombinace následujících (každý maximálně jednou):
 (nepovinný, viz níže) -r REGIONS_FILE — pro příkaz regions vypisuje místo NUTS 3 kódu kraje jeho jméno. Mapování kódů na jména je v souboru REGIONS_FILE
 -h — vypíše nápovědu s krátkým popisem každého příkazu a přepínače.
 Popis
-Skript filtruje záznamy osob s prokázanou nákazou koronavirem způsobujícím onemocnění COVID-19. Pokud je skriptu zadán také příkaz, nad filtrovanými záznamy daný příkaz provede.
+Skript filtruje záznamy osob s prokázanou nákazou koronavirem způsobujícím onemocnění COVID-19. Pokud je skriptu zadán také příkaz, nad filtrovanými záznamy daný příkaz provede. Pokud příkaz zadán není, implicitně se použije příkaz merge.
 Pokud skript nedostane ani filtr ani příkaz, opisuje záznamy na standardní výstup.
 Skript umí zpracovat i záznamy komprimované pomocí nástrojů gzip a bzip2 (v případě, že název souboru končí .gz resp. .bz2).
 V případě, že skript na příkazové řádce nedostane soubory se záznamy (LOG, LOG2, …), očekává záznamy na standardním vstupu.
@@ -294,6 +294,8 @@ Blansko         : 34374
 Brno-mesto      : 123692
 ...
 Zdar nad Sazavou: 37928
+Zlin            : 69348
+Znojmo          : 32733
 None            : 2959
 $ ./corona -r kraje.csv regions osoby.csv
 Hlavni mesto Praha  : 448252
@@ -311,14 +313,3 @@ Stredocesky kraj    : 482138
 Ustecky kraj        : 248821
 Zlinsky kraj        : 198910
 None                : 2926
-Popis úlohy
-Specifikace rozhraní skriptu
-Popis
-Podrobné požadavky
-Implementační detaily
-Odevzdání projektu
-Rady
-Návratová hodnota
-Příklady použití
-Rozšíření
-Built with Pandoc using pandoc-bootstrap theme

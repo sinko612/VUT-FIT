@@ -193,28 +193,33 @@ do
                 exit 1
             fi
             COMMAND="$ARGUMENT"
+            #shift
             ;;
         *)
 		    eval FILE=\$$i
+            #echo "$FILE"
 		    case "$FILE" in
-		        *.gz)
-			        if [ "$FILE_IN" != "" ]
+		        *.csv.gz)
+                    if [ "$FILE_IN" != "" ]
                     then
                         POMF="$FILE$(gzip -d -c "$1")\n"
                         head -1 $POMF > $FILE_IN
                         tail -n +2 -q $POMF >> $FILE_IN
                     else                     
-                        FILE_IN="$FILE$(gzip -d -c "$1")\n"
+                        POMF="$FILE$(gzip -d -c "$1")\n"
+                        FILE_IN="$FILE_IN $POMF"
                     fi    
 			        ;;
-		        *.bz2)
+		        *.cvs.bz2)
 			        if [ "$FILE_IN" != "" ]
                     then
                         POMF="$FILE$(bzip2 -d -c "$1")\n"
                         head -1 $POMF > $FILE_IN
                         tail -n +2 -q $POMF >> $FILE_IN
+                        FILE_IN="$FILE_IN $POMF"
                     else 
-                        FILE_IN="$FILE$(bzip2 -d -c "$1")\n"
+                        POMF="$FILE$(bzip2 -d -c "$1")\n"
+                        FILE_IN="$FILE_IN $POMF"
                     fi    
 			        ;;
                 *)
@@ -225,8 +230,9 @@ do
                     else    
                         FILE_IN="$FILE_IN $FILE" 
                     fi
-                    ;;    
+                    ;;        
 		    esac	
+            shift
 		    ;;        
     esac 
     i=`expr $i + 1`
@@ -245,6 +251,9 @@ fi
 INPUT=$(echo "$INPUT" | awk -F"," '{print $0}')
 INPUT="$(echo "$INPUT" | tr -d ' ')"
 INPUT=$(echo "$INPUT" | awk -F"," -v ADATE="$ADAT" -v BDATE="$BDAT" '{if($2 >= ADATE && $2 <= BDATE) {print $0}}')
+
+echo "$INPUT" | awk -F, '{if(!($3 ~ /^[0-9]+$/ && $3 >= 0) && $3 != "") {printf "Invalid age: %s\n",$0}}' | cat >&2
+INPUT=$(echo "$INPUT" | awk -F"," '$3 ~ /^[0-9]+$/ && $3 >= 0 || $3 == "" ')
 
 if [ "$GENDER" != "" ]
 then
@@ -464,7 +473,7 @@ then
                         printf("\n");
 
                         printf("96-105: ");
-                        pom=int(POC005/(10000));
+                        pom=int(POC105/(10000));
                         for(i=0; i < pom; i++){
                             printf("#");}
                         printf("\n");
@@ -520,7 +529,7 @@ then
                         if(MAXm < POC105){MAXm=POC105}
                         if(MAXm < POC00A){MAXm=POC00A}
                         if(NONE != 0){if(MAXm < NONE){MAXm=NONE}}                        
-                        printf("%d\n",MAXm)
+                        
                         printf("0-5   : ");
                         pom=int(((POC005)*(sirka))/(MAXm));
                         for(i=0; i < pom; i++){
@@ -783,7 +792,7 @@ then
             KRAJINA=$(echo "$KRAJINA" | sort)
             if [ "$WIDTH" == "" ]
             then
-                echo "$KRAJINA" | sort | uniq -c | awk '{{if (length($2) != 0){printf ("%s: %s\n",$2, $1)}}}'
+                echo "$KRAJINA" | sort | uniq -c | awk '{{if (length($2) != 0){if($2 != "CZ"){printf ("%s: %s\n",$2, $1)}}}}'
                 exit 0
             elif [ "$WIDTH" == 0 ]
             then
@@ -791,11 +800,14 @@ then
                     {
                         if (length($2) != 0) 
                         {
-                            pom=int($1/(100));
-                            printf ("%s: ",$2); 
-                            for(i=0; i < pom; i++){
-                                printf("#");}
-                            printf("\n");
+                            if($2 != "CZ")
+                            {
+                                pom=int($1/(100));
+                                printf ("%s: ",$2); 
+                                for(i=0; i < pom; i++){
+                                    printf("#");}
+                                printf("\n");
+                            }    
                         } 
                     }'
                 exit 0
@@ -807,11 +819,12 @@ then
                 MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
                 DLZ="$WIDTH"
                 echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    if ($1 != "CZ"){
                     pocet=int((($2)*(sirka))/(maxm))
                     printf("%s: ",$1 )
                     for(i=0; i < pocet; i++){printf("#")}
                     printf("\n")
-                    }'
+                    }}'
                 exit 0
             fi
             ;;
@@ -837,13 +850,13 @@ then
                             for(i=0; i < pom; i++){
                                 printf("#");}
                             printf("\n");
-                        }
-                        else {NONE+=1}    
-                    }
-                    END{if(NONE != 0)
+                        }   
+                    }'
+                    echo "$OKRES" | awk '/^[[:space:]]*$/ {NONE+=1} END {
+                        if(NONE != 0)
                         {
                             printf ("None: ", NONE);
-                            pom=int($1/(1000));
+                            pom=int(NONE/(1000));
                             for(i=0; i < pom; i++){
                                 printf("#");}
                             printf("\n");
@@ -852,18 +865,37 @@ then
             else 
                 VSTUP=$(echo "$OKRES" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
                     {
-                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
-                        else { NONE+=1 }    
-                    }
-                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }    
+                    }')
                 MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+
+                NONE=0
+                VSTUP_N=$(echo "$OKRES" | awk -v none="$NONE" '/^[[:space:]]*$/ {none+=1} END {if(none != 0) printf("None: %d\n",none)}')
+                MAX_N=$(echo "$VSTUP_N"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                echo "$MAX_N"
+                if [ "$MAX" -le "$MAX_N" ] 
+                then
+                    MAX=MAX_N
+                fi    
                 DLZ="$WIDTH"
+
                 echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
                     pocet=int((($2)*(sirka))/(maxm))
                     printf("%s: ",$1 )
                     for(i=0; i < pocet; i++){printf("#")}
                     printf("\n")
                     }'
+
+                if [ "$MAX_N" != 0 ]
+                then
+                    echo "$VSTUP_N"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                fi
+
                 exit 0
             fi
             ;;
@@ -880,7 +912,7 @@ then
                 exit 0
             elif [ "$WIDTH" == 0 ]
             then
-                echo "$KRAJ" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                echo "$KRAJ" | sort | uniq -c | awk '
                     {
                         if (length($2) != 0) 
                         {
@@ -889,33 +921,53 @@ then
                             for(i=0; i < pom; i++){
                                 printf("#");}
                             printf("\n");
-                        }
-                        else {NONE+=1}    
-                    }
-                    END{if(NONE != 0)
+                        }}'
+                NONE=0
+                echo "$KRAJ" | awk '/^[[:space:]]*$/ {NONE+=1} 
+                END {
+                        if(NONE != 0) 
                         {
                             printf ("None: ", NONE);
-                            pom=int($1/(10000));
+                            pom=int(NONE/(10000));
                             for(i=0; i < pom; i++){
                                 printf("#");}
                             printf("\n");
-                        }}'
+                    }}'
                 exit 0
             else 
                 VSTUP=$(echo "$KRAJ" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
                     {
                         if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
-                        else { NONE+=1 }    
-                    }
-                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                    }')
                 MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+
+                NONE=0
+                VSTUP_N=$(echo "$KRAJ" | awk -v none="$NONE" '/^[[:space:]]*$/ {none+=1} END {if(none != 0) printf("None: %d\n",none)}')
+                MAX_N=$(echo "$VSTUP_N"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                echo "$MAX_N"
+                if [ "$MAX" -le "$MAX_N" ] 
+                then
+                    MAX=MAX_N
+                fi
+
                 DLZ="$WIDTH"
+
                 echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
                     pocet=int((($2)*(sirka))/(maxm))
                     printf("%s: ",$1 )
                     for(i=0; i < pocet; i++){printf("#")}
                     printf("\n")
                     }'
+
+                if [ "$MAX_N" != 0 ]
+                then
+                    echo "$VSTUP_N"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                fi
                 exit 0
             fi
             ;;

@@ -1,0 +1,979 @@
+#!/bin/sh
+
+#IOS projekt1 *corona* 
+#Simona Jánošíková (xjanos19)  
+
+export POSIXLY_CORRECT=yes
+export LC_NUMERIC=en_US.UTF-8
+
+##### FUNKCIA PRE VYPIS NAPOVEDY #####
+hint_print()
+{
+    echo ""
+    echo "USAGE:" 
+    echo ""   
+    echo "  corona [-h]"
+	echo "  corona [FILTERS] [COMMAND] [LOG [LOG2 [..]]]"
+    echo ""
+    echo "FILTERS:"
+    echo ""
+    echo "  -h"
+    echo "      vypíše nápovědu s krátkým popisem každého příkazu a přepínače"
+    echo ""
+    echo "  -a DATETIME; — after"
+    echo "      jsou uvazovany pouze zaznamy PO tomto datu (vcetne tohoto data)"
+    echo "      DATETIME je formatu YYYY-MM-DD"
+    echo ""
+    echo "  -b DATETIME; — before"
+    echo "      zaznamy uvazovany pouze PRED timto datem (vcetne tohoto data)"
+    echo ""
+    echo "  -g GENDER"
+    echo "      jsou uvazovany pouze zaznamy nakazenych osob daneho pohlavi" 
+    echo "      GENDER muze byt M (muzi) nebo Z (zeny)"
+    echo ""
+    echo "  -s [WIDTH]"
+    echo "      prikazy: gender, age, daily, monthly, yearly, countries, districts, regions"
+    echo "      vypisuje data ne ciselne, ale graficky v podobe histogramu"
+    echo "      WIDTH nastavuje sirku histogramu = delku nejdelsiho radku, na WIDTH"
+    echo "      WIDTH musi být kladne cele císlo"
+    echo ""
+    echo "COMMAND:"
+    echo ""
+    echo "  infected"
+    echo "      spocita pocet nakazenych"
+    echo ""
+    echo "  merge"
+    echo "      slouci nekolik souboru se zaznamy do jednoho"
+    echo ""
+    echo "  gender"
+    echo "      vypise pocet nakazenych pro jednotliva pohlavi"
+    echo ""
+    echo "  age"
+    echo "      vypise statistiku poctu nakazenych osob dle veku"
+    echo ""
+    echo "  daily"
+    echo "      vypise statistiku nakazených osob pro jednotlive dny"
+    echo ""
+    echo "  monthly"
+    echo "      vypise statistiku nakazenych osob pro jednotlive mesice"
+    echo ""
+    echo "  yearly"
+    echo "      vypise statistiku nakazenych osob pro jednotlive roky"
+    echo ""
+    echo "  countries"
+    echo "      vypise statistiku nakazenych osob pro jednotlive zeme nakazy bez CR"
+    echo ""
+    echo "  districts"
+    echo "      vypise statistiku nakazenych osob pro jednotlive okresy"
+    echo ""
+    echo "  regions"
+    echo "      vypise statistiku nakazenych osob pro jednotlive kraje"
+    echo ""
+}
+
+i=1
+ADAT="0000-00-00"
+BDAT="9999-99-99"
+WIDTH=""
+GENDER=""
+COMMAND=""
+ARGUMENT=""
+FILE_IN=""
+##### NACITANIE ARGUMENTOV #####
+while [ $i -le $# ]
+do
+    eval ARGUMENT=\$$i
+    case "$ARGUMENT" in 
+        -h)
+            if [ $# -ne 1 ]
+            then
+                echo "Nespravne volanie napovedy -h" >&2
+                exit 1
+            fi   
+            hint_print
+            exit 0
+            ;;
+        -a)
+            pom=`expr $i + 1`
+		    if [ "$ADAT" != "0000-00-00" ]
+            then 
+                echo "Viacnasobne zadany argument -a" >&2
+                exit 1
+            fi
+            eval ADAT="\$$pom"
+            if ! [[ $ADAT =~ ^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$ ]]
+            then
+                echo "Neexistujuci datum -a" >&2
+                exit 1
+            elif [[ $ADAT =~ ^[0-9]{4}-(0[2])-([3-9][0-9])$ ]]     
+            then
+                echo "Neexistujuci datum -a" >&2
+                exit 1
+            elif [[ $ADAT =~ ^[0-9]{4}-(04|06|09|11)-(3[1-9]|[4-9][0-9])$ ]]
+            then
+                echo "Neexistujuci datum -a" >&2
+                exit 1
+            fi
+            shift
+		    ;;
+        -b)
+            pom=`expr $i + 1`
+            if [ "$BDAT" != "9999-99-99" ]
+            then 
+                echo "Viacnasobne zadany argument -b" >&2
+                exit 1
+            fi
+            eval BDAT="\$$pom"
+            if ! [[ $BDAT =~ ^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$ ]]
+            then
+                echo "Neexistujuci datum -b" >&2
+                exit 1
+            elif [[ $BDAT =~ ^[0-9]{4}-(0[2])-([3-9][0-9])$ ]]     
+            then
+                echo "Neexistujuci datum -b" >&2
+                exit 1
+            elif [[ $BDAT =~ ^[0-9]{4}-(04|06|09|11)-(3[1-9]|[4-9][0-9])$ ]]
+            then
+                echo "Neexistujuci datum -b" >&2
+                exit 1                
+            fi
+            shift
+            ;;
+        -g)
+            pom=`expr $i + 1`
+            if [ "$GENDER" != "" ]
+            then
+                echo "Viacnasobne zadany argument -g" >&2
+                exit 1
+            fi
+            eval GENDER="\$$pom"
+            if [ "$GENDER" == "Z" ]
+            then
+                GENDER="Z"
+            elif [ "$GENDER" == "M" ]
+            then
+                GENDER="M"
+            else
+                echo "Nespravne zadany argument -g" >&2
+                exit 1
+            fi
+            shift
+            ;;            
+        -s)
+            pom=`expr $i + 1`
+            if [ "$WIDTH" != "" ]
+            then 
+                echo "Viacnasobne zadany argument -s" >&2
+                exit 1
+            else
+                eval WIDTH="\$$pom"
+                check=0
+                case "$WIDTH" in
+                    "-a" | "-b" | "-g" | "infected" | "merge" | "gender" | "age" | "daily" | "monthly" | "yearly" | "countries" | "districts" | "regions")
+                        WIDTH=0
+                        check=1
+                        ;;
+                esac
+                if [ "$check" == 0 ]
+                then            
+                    if [ -z "${WIDTH##*[!0-9]*}" ]
+                    then
+                        echo "Nespravne zadany argument -s (-s nie je cele kladne cislo)" >&2
+                        exit 1
+                    fi
+                    shift 
+                fi     
+            fi
+            ;;
+
+        "infected" | "merge" | "gender" | "age" | "daily" | "monthly" | "yearly" | "countries" | "districts" | "regions")
+            if [ "$COMMAND" != "" ]
+            then
+                echo "Viacnasobne zadanie coomandov" >&2
+                exit 1
+            fi
+            COMMAND="$ARGUMENT"
+            #shift
+            ;;
+        *)
+		    eval FILE=\$$i
+            #echo "$FILE"
+		    case "$FILE" in
+		        *.csv.gz)
+                    if [ "$FILE_IN" != "" ]
+                    then
+                        POMF="$FILE$(gzip -d -c "$1")\n"
+                        head -1 $POMF > $FILE_IN
+                        tail -n +2 -q $POMF >> $FILE_IN
+                    else                     
+                        POMF="$FILE$(gzip -d -c "$1")\n"
+                        FILE_IN="$FILE_IN $POMF"
+                    fi    
+			        ;;
+		        *.cvs.bz2)
+			        if [ "$FILE_IN" != "" ]
+                    then
+                        POMF="$FILE$(bzip2 -d -c "$1")\n"
+                        head -1 $POMF > $FILE_IN
+                        tail -n +2 -q $POMF >> $FILE_IN
+                        FILE_IN="$FILE_IN $POMF"
+                    else 
+                        POMF="$FILE$(bzip2 -d -c "$1")\n"
+                        FILE_IN="$FILE_IN $POMF"
+                    fi    
+			        ;;
+                *)
+                    if [ "$FILE_IN" != "" ]
+                    then 
+                        head -1 $FILE > $FILE_IN
+                        tail -n +2 -q $FILE >> $FILE_IN
+                    else    
+                        FILE_IN="$FILE_IN $FILE" 
+                    fi
+                    ;;        
+		    esac	
+            shift
+		    ;;        
+    esac 
+    i=`expr $i + 1`
+done
+
+##### NACITANIE SUBORU #####
+if [ "$FILE_IN" != "" ]
+then
+    INPUT=`cat $FILE_IN`
+else
+    INPUT=`cat -`
+fi
+
+##### FILTROVANIE #####
+#INPUT=$(echo "$INPUT" | awk -F"," -v ADATE="$ADAT" -v BDATE="$BDAT" '{if($2 >= ADATE && $2 <= BDATE) {print $0}}')    
+INPUT=$(echo "$INPUT" | awk -F"," '{print $0}')
+INPUT="$(echo "$INPUT" | tr -d ' ')"
+INPUT=$(echo "$INPUT" | awk -F"," -v ADATE="$ADAT" -v BDATE="$BDAT" '{if($2 >= ADATE && $2 <= BDATE) {print $0}}')
+
+echo "$INPUT" | awk -F, '{if(!($3 ~ /^[0-9]+$/ && $3 >= 0) && $3 != "") {printf "Invalid age: %s\n",$0}}' | cat >&2
+INPUT=$(echo "$INPUT" | awk -F"," '$3 ~ /^[0-9]+$/ && $3 >= 0 || $3 == "" ')
+
+if [ "$GENDER" != "" ]
+then
+    INPUT="$(echo "$INPUT" | tr -d ' ')"
+    if [ "$GENDER" == "M" ]
+    then
+        INPUT=$(echo "$INPUT" | awk -F"," -v GEN="$GENDER" '{if($4 == GEN) {print $0}}')
+    elif [ "$GENDER" == "Z" ]
+    then
+        INPUT=$(echo "$INPUT" | awk -F"," -v GEN="$GENDER" '{if($4 == GEN) {print $0}}')
+    fi
+fi
+
+#### PRIKAZY #####
+if [ "$COMMAND" != "" ]
+then
+    case "$COMMAND" in
+        "infected")
+            POC_INF=0
+            POC_INF=$(echo "$INPUT" | awk -F"," -v inf="$POC_INF" '{inf+=1} END{printf inf}')
+			echo "$POC_INF"
+            exit 0
+            ;;
+
+        "merge")
+            # tento command som neprogramovala, pretoze sa subory musia implicitne zlucit ak ich je viac na vstupe,#
+            # coz mam naprogramovane pri citani vstupu a tu je to zbytocne, pretoze robota uz bola vykonana #
+            exit 0
+            ;;
+
+        "gender")
+            GEND=$(echo  "$INPUT" | awk -F "," '{print $4}')
+            GEND="$(echo "$GEND" | tr -d ' ')"
+            GEND=$(echo "$GEND" | sort)
+            if [ "$WIDTH" == "" ]
+            then 
+                echo "$GEND" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0){printf ("%s: %s\n",$2, $1)}
+                        else{NONE+=1}    
+                    }
+                    END{if(NONE != 0){printf ("None: %d\n", NONE)}}'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$GEND" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(100000));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0)
+                        {
+                            printf ("None: ", NONE);
+                            pom=int($1/(100000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$GEND" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                        else { NONE+=1 }    
+                    }
+                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                MAX=$(echo "$VSTUP" | awk -F":"  'BEGIN{ MAX=0 } 
+                { 
+                    if ( $2>MAX ) { MAX=$2 } 
+                } 
+                END{ printf("%d\n",MAX) } ')
+                DLZ="$WIDTH"
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                exit 0   
+            fi     
+            ;;
+
+        "age")
+            POC005=0
+            POC015=0
+            POC025=0
+            POC035=0
+            POC045=0
+            POC055=0
+            POC065=0
+            POC075=0
+            POC085=0
+            POC095=0
+            POC105=0
+            POC00A=0
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$INPUT" | awk -F"," 'BEGIN{ NONE=0 }
+                    {
+                        if ((($3 -ge 0) 2>/dev/null))
+                        {
+                            if ($3 >= 0 && $3 <= 5) { POC005+=1} 
+                            if ($3 >= 6 && $3 <= 15) { POC015+=1; }  
+                            if ($3 >= 16 && $3 <= 25) { POC025+=1; } 
+                            if ($3 >= 26 && $3 <= 35) { POC035+=1; } 
+                            if ($3 >= 36 && $3 <= 45) { POC045+=1; } 
+                            if ($3 >= 46 && $3 <= 55) { POC055+=1; } 
+                            if ($3 >= 56 && $3 <= 65) { POC065+=1; } 
+                            if ($3 >= 66 && $3 <= 75) { POC075+=1; }  
+                            if ($3 >= 76 && $3 <= 85) { POC085+=1; } 
+                            if ($3 >= 86 && $3 <= 95) { POC095+=1; } 
+                            if ($3 >= 96 && $3 <= 105) { POC105+=1; } 
+                            if ($3 > 105) { POC00A+=1; } 
+                            if (length($3) == 0){NONE+=1}
+                        }
+                        else {echo "Invalid age: $1"}
+                    }
+                    END{
+                        if(NONE == 0)
+                        {
+                            printf("0-5   : %d\n6-15  : %d\n16-25 : %d\n26-35 : %d\n36-45 : %d\n46-55 : %d\n56-65 : %d\n66-75 : %d\n76-85 : %d\n86-95 : %d\n96-105: %d\n>105  : %d\n",POC005,POC015,POC025,POC035,POC045,POC055,POC065,POC075,POC085,POC095,POC105,POC00A)
+                        }
+                        else
+                        {
+                        printf("0-5   : %d\n6-15  : %d\n16-25 : %d\n26-35 : %d\n36-45 : %d\n46-55 : %d\n56-65 : %d\n66-75 : %d\n76-85 : %d\n86-95 : %d\n96-105: %d\n>105  : %d\nNone: %d\n",POC005,POC015,POC025,POC035,POC045,POC055,POC065,POC075,POC085,POC095,POC105,POC00A,NONE) 
+                        }
+                    }'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then  
+                echo "$INPUT" | awk -F"," 'BEGIN{ NONE=0 }
+                    {
+                        if ((($3 -ge 0) 2>/dev/null))
+                        {
+                            if ($3 >= 0 && $3 <= 5) { POC005+=1} 
+                            if ($3 >= 6 && $3 <= 15) { POC015+=1; }  
+                            if ($3 >= 16 && $3 <= 25) { POC025+=1; } 
+                            if ($3 >= 26 && $3 <= 35) { POC035+=1; } 
+                            if ($3 >= 36 && $3 <= 45) { POC045+=1; } 
+                            if ($3 >= 46 && $3 <= 55) { POC055+=1; } 
+                            if ($3 >= 56 && $3 <= 65) { POC065+=1; } 
+                            if ($3 >= 66 && $3 <= 75) { POC075+=1; }  
+                            if ($3 >= 76 && $3 <= 85) { POC085+=1; } 
+                            if ($3 >= 86 && $3 <= 95) { POC095+=1; } 
+                            if ($3 >= 96 && $3 <= 105) { POC105+=1; } 
+                            if ($3 > 105) { POC00A+=1; } 
+                            if (length($3) == 0){NONE+=1}
+                        }
+                        else {echo "Invalid age: $1"}
+                    }
+                    END{
+                        printf("0-5   : ");
+                        pom=int(POC005/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("6-15  : ");
+                        pom=int(POC015/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("16-25 : ");
+                        pom=int(POC025/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("26-35 : ");
+                        pom=int(POC035/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("36-45 : ");
+                        pom=int(POC045/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("46-55 : ");
+                        pom=int(POC055/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("56-65 : ");
+                        pom=int(POC065/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("66-75 : ");
+                        pom=int(POC075/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("76-85 : ");
+                        pom=int(POC085/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("86-95 : ");
+                        pom=int(POC095/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("96-105: ");
+                        pom=int(POC105/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf(">105  : ");
+                        pom=int(POC00A/(10000));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        if(NONE != 0)
+                        {
+                            printf("None  : ");
+                            pom=int(NONE/(10000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                }'
+                exit 0
+            else
+                echo "$INPUT" | awk -F"," -v sirka="$WIDTH" 'BEGIN{ NONE=0 }
+                    {
+                        if ((($3 -ge 0) 2>/dev/null))
+                        {
+                            if ($3 >= 0 && $3 <= 5) { POC005+=1} 
+                            if ($3 >= 6 && $3 <= 15) { POC015+=1; }  
+                            if ($3 >= 16 && $3 <= 25) { POC025+=1; } 
+                            if ($3 >= 26 && $3 <= 35) { POC035+=1; } 
+                            if ($3 >= 36 && $3 <= 45) { POC045+=1; } 
+                            if ($3 >= 46 && $3 <= 55) { POC055+=1; } 
+                            if ($3 >= 56 && $3 <= 65) { POC065+=1; } 
+                            if ($3 >= 66 && $3 <= 75) { POC075+=1; }  
+                            if ($3 >= 76 && $3 <= 85) { POC085+=1; } 
+                            if ($3 >= 86 && $3 <= 95) { POC095+=1; } 
+                            if ($3 >= 96 && $3 <= 105) { POC105+=1; } 
+                            if ($3 > 105) { POC00A+=1; } 
+                            if (length($3) == 0){NONE+=1}
+                        }
+                        else {echo "Invalid age: $1"}
+                    }
+                    END{
+                        MAXm=POC005;
+                        if(MAXm < POC015){MAXm=POC015}
+                        if(MAXm < POC025){MAXm=POC025}
+                        if(MAXm < POC035){MAXm=POC035}
+                        if(MAXm < POC045){MAXm=POC045}
+                        if(MAXm < POC055){MAXm=POC055}
+                        if(MAXm < POC065){MAXm=POC065}
+                        if(MAXm < POC075){MAXm=POC075}
+                        if(MAXm < POC085){MAXm=POC085}
+                        if(MAXm < POC095){MAXm=POC095}
+                        if(MAXm < POC105){MAXm=POC105}
+                        if(MAXm < POC00A){MAXm=POC00A}
+                        if(NONE != 0){if(MAXm < NONE){MAXm=NONE}}                        
+                        
+                        printf("0-5   : ");
+                        pom=int(((POC005)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("6-15  : ");
+                        pom=int(((POC015)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("16-25 : ");
+                        pom=int(((POC025)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("26-35 : ");
+                        pom=int(((POC035)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("36-45 : ");
+                        pom=int(((POC045)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("46-55 : ");
+                        pom=int(((POC055)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("56-65 : ");
+                        pom=int(((POC065)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("66-75 : ");
+                        pom=int(((POC075)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("76-85 : ");
+                        pom=int(((POC085)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("86-95 : ");
+                        pom=int(((POC095)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf("96-105: ");
+                        pom=int(((POC105)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        printf(">105  : ");
+                        pom=int(((POC00A)*(sirka))/(MAXm));
+                        for(i=0; i < pom; i++){
+                            printf("#");}
+                        printf("\n");
+
+                        if(NONE != 0)
+                        {
+                            printf("None  : ");
+                            pom=int(((NONE)*(sirka))/(MAXm));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                }'
+                exit 0
+            fi  
+            ;;
+
+        "daily")
+            DAY=$(echo  "$INPUT" | awk -F "," '{print $2}')
+            DAY="$(echo "$DAY" | tr -d ' ')"
+            DAY=$(echo "$DAY" | sort)   
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$DAY" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                        else { NONE+=1 }    
+                    }
+                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$DAY" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(500));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0)
+                        {
+                            printf ("None: ", NONE);
+                            pom=int($1/(500));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$DAY" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                        else { NONE+=1 }    
+                    }
+                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                MAX=$(echo "$VSTUP" | awk -F":"  'BEGIN{ MAX=0 } 
+                { 
+                    if ( $2>MAX ) { MAX=$2 } 
+                } 
+                END{ printf("%d\n",MAX) } ')
+                DLZ="$WIDTH"
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                exit 0
+        fi
+        ;;
+
+        "monthly")
+            MONTH=$(echo  "$INPUT" | awk -F "," '{print $2}')
+            MONTH="$(echo "$MONTH" | tr -d ' ')"
+            MONTH="$(echo "$MONTH" | rev | cut -c4- | rev )"
+            MONTH=$(echo "$MONTH" | sort)   
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$MONTH" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0){printf ("%s: %s\n",$2, $1)}
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0){printf ("None: %d\n", NONE)}}'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$MONTH" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(10000));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0)
+                        {
+                            printf ("None: ", NONE);
+                            pom=int($1/(10000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$MONTH" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                        else { NONE+=1 }    
+                    }
+                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                DLZ="$WIDTH"
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                exit 0
+            fi     
+            ;;
+
+        "yearly")
+            YEAR=$(echo  "$INPUT" | awk -F "," '{print $2}')
+            YEAR="$(echo "$YEAR" | tr -d ' ')"
+            YEAR="$(echo "$YEAR" | rev | cut -c7- | rev )"
+            YEAR=$(echo "$YEAR" | sort)
+            if [ "$WIDTH" == "" ]
+            then   
+                echo "$YEAR" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0){printf ("%s: %s\n",$2, $1)}
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0){printf ("None: %d\n", NONE)}}'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$YEAR" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(100000));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }
+                        else {NONE+=1}    
+                    }
+                    END{if(NONE != 0)
+                        {
+                            printf ("None: ", NONE);
+                            pom=int($1/(100000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$YEAR" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                        else { NONE+=1 }    
+                    }
+                    END{if(NONE != 0) {printf ("None: %d\n", NONE)}}')
+                MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                DLZ="$WIDTH"
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                exit 0
+            fi    
+            ;;
+            
+        "countries")
+            KRAJINA=$(echo  "$INPUT" | awk -F "," '{print $8}')
+            KRAJINA="$(echo "$KRAJINA" | tr -d ' ')"
+            KRAJINA=$(echo "$KRAJINA" | sort)
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$KRAJINA" | sort | uniq -c | awk '{{if (length($2) != 0){if($2 != "CZ"){printf ("%s: %s\n",$2, $1)}}}}'
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$KRAJINA" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            if($2 != "CZ")
+                            {
+                                pom=int($1/(100));
+                                printf ("%s: ",$2); 
+                                for(i=0; i < pom; i++){
+                                    printf("#");}
+                                printf("\n");
+                            }    
+                        } 
+                    }'
+                exit 0
+            else 
+                VSTUP=$(echo "$KRAJINA" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }    
+                    }')
+                MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                DLZ="$WIDTH"
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    if ($1 != "CZ"){
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }}'
+                exit 0
+            fi
+            ;;
+
+        "districts")
+            OKRES=$(echo  "$INPUT" | awk -F "," '{print $6}')
+            OKRES="$(echo "$OKRES" | tr -d ' ')"
+            OKRES=$(echo "$OKRES" | sort)
+            NONE=0
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$OKRES" | sort | uniq -c | awk '{{if (length($2) != 0){printf ("%s: %s\n",$2, $1)}}}'
+                echo "$OKRES" | awk '/^[[:space:]]*$/ {NONE+=1} END {if(NONE != 0) printf("None: %d\n",NONE)}'   
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$OKRES" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(1000));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }   
+                    }'
+                    echo "$OKRES" | awk '/^[[:space:]]*$/ {NONE+=1} END {
+                        if(NONE != 0)
+                        {
+                            printf ("None: ", NONE);
+                            pom=int(NONE/(1000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$OKRES" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }    
+                    }')
+                MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+
+                NONE=0
+                VSTUP_N=$(echo "$OKRES" | awk -v none="$NONE" '/^[[:space:]]*$/ {none+=1} END {if(none != 0) printf("None: %d\n",none)}')
+                MAX_N=$(echo "$VSTUP_N"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                echo "$MAX_N"
+                if [ "$MAX" -le "$MAX_N" ] 
+                then
+                    MAX=MAX_N
+                fi    
+                DLZ="$WIDTH"
+
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+
+                if [ "$MAX_N" != 0 ]
+                then
+                    echo "$VSTUP_N"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                fi
+
+                exit 0
+            fi
+            ;;
+        
+        "regions")
+            KRAJ=$(echo  "$INPUT" | awk -F "," '{print $5}')
+            KRAJ="$(echo "$KRAJ" | tr -d ' ')"
+            KRAJ=$(echo "$KRAJ" | sort)
+            NONE=0
+            if [ "$WIDTH" == "" ]
+            then
+                echo "$KRAJ" | sort | uniq -c | awk '{{if (length($2) != 0){printf ("%s: %s\n",$2, $1)}}}'
+                echo "$KRAJ" | awk '/^[[:space:]]*$/ {NONE+=1} END {if(NONE != 0) printf("None: %d\n",NONE)}'    
+                exit 0
+            elif [ "$WIDTH" == 0 ]
+            then
+                echo "$KRAJ" | sort | uniq -c | awk '
+                    {
+                        if (length($2) != 0) 
+                        {
+                            pom=int($1/(10000));
+                            printf ("%s: ",$2); 
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                        }}'
+                NONE=0
+                echo "$KRAJ" | awk '/^[[:space:]]*$/ {NONE+=1} 
+                END {
+                        if(NONE != 0) 
+                        {
+                            printf ("None: ", NONE);
+                            pom=int(NONE/(10000));
+                            for(i=0; i < pom; i++){
+                                printf("#");}
+                            printf("\n");
+                    }}'
+                exit 0
+            else 
+                VSTUP=$(echo "$KRAJ" | sort | uniq -c | awk 'BEGIN{ NONE=0 }
+                    {
+                        if (length($2) != 0) { printf ("%s: %s\n",$2, $1) }
+                    }')
+                MAX=$(echo "$VSTUP"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+
+                NONE=0
+                VSTUP_N=$(echo "$KRAJ" | awk -v none="$NONE" '/^[[:space:]]*$/ {none+=1} END {if(none != 0) printf("None: %d\n",none)}')
+                MAX_N=$(echo "$VSTUP_N"| awk -F ":" 'BEGIN {max = 0} {if ($2>max) {max=$2}} END {print max}')
+                echo "$MAX_N"
+                if [ "$MAX" -le "$MAX_N" ] 
+                then
+                    MAX=MAX_N
+                fi
+
+                DLZ="$WIDTH"
+
+                echo "$VSTUP"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+
+                if [ "$MAX_N" != 0 ]
+                then
+                    echo "$VSTUP_N"| awk -F ":" -v sirka="$WIDTH" -v maxm="$MAX" '{
+                    pocet=int((($2)*(sirka))/(maxm))
+                    printf("%s: ",$1 )
+                    for(i=0; i < pocet; i++){printf("#")}
+                    printf("\n")
+                    }'
+                fi
+                exit 0
+            fi
+            ;;
+    esac
+fi
+
+#####
+INPUT=$(echo "$INPUT") 
+echo "$INPUT"

@@ -2,7 +2,7 @@
 # autor: Simona Jánošíková, xjanos19
 
 CC=gcc
-CFLAGS=-std=gnu99 -Wall -Wextra -Werror -pedantic
+CFLAGS=-std=gnu99 -Wall -Wextra -Werror -pedantic -pthread
 
 proj2: proj2.o
 	$(CC) $(CFLAGS) proj2.o -o proj2

@@ -1,5 +1,5 @@
 -- uart_fsm.vhd: UART controller - finite state machine
--- Author(s): Simona Jáno?íková xjanos19
+-- Author(s): Simona Janosikova (xjanos19)
 --
 library ieee;
 use ieee.std_logic_1164.all;
@@ -24,56 +24,54 @@ architecture behavioral of UART_FSM is
   signal condition : possible_condition := START;   
   
 begin
-   process (CLK)
+   process (CLK,RST)
    begin
-      if (CLK'event and CLK='1') then 
-        ST_WAIT <= '0';  
+    if (RST = '1') then
+      ST_WAIT <= '0';  
+      ST_DATA <= '0';
+      VLD_OUT <= '0'; 
+      condition <= START;  
+         
+    elsif (CLK'event) and (CLK='1') then 
+      ST_WAIT <= '0';  
+      ST_DATA <= '0';
+      VLD_OUT <= '0';
+            
+      if (condition) = START and DIN = '1' then
+        condition <= START;
+        ST_WAIT <= '0';
         ST_DATA <= '0';
         VLD_OUT <= '0';
-        
-        if (RST) = '1' then
-          ST_WAIT <= '0';  
-          ST_DATA <= '0';
-          VLD_OUT <= '0'; 
-          condition <= START;
           
-        elsif (condition) = START and DIN = '1' then
-          condition <= START;
-          ST_WAIT <= '0';
-          ST_DATA <= '0';
-          VLD_OUT <= '0';
+      elsif (condition) = START and DIN = '0' then
+        condition <= WAIT_C;
+        ST_WAIT <= '1'; 
+        ST_DATA <= '0';
           
-        elsif (condition) = START and DIN = '0' then
-          condition <= WAIT_C;
-          ST_WAIT <= '1'; 
-          ST_DATA <= '0';
+      elsif (condition) = WAIT_C and (CNT_READ) =  "01000" then  
+        condition <= READ;
+        ST_WAIT <= '1';
+        ST_DATA <= '1';
           
-        elsif (condition) = WAIT_C and (CNT_READ) =  "01000" then  
-          condition <= READ;
-          ST_WAIT <= '1';
-          ST_DATA <= '1';
+      elsif (condition) = WAIT_C and (CNT_READ) /= "01000" then 
+        condition <= WAIT_C;
+        ST_WAIT <= '1';
+        ST_DATA <= '0';
           
-        elsif (condition) = WAIT_C and (CNT_READ) /= "01000" then 
-          condition <= WAIT_C;
-          ST_WAIT <= '1';
-          ST_DATA <= '0';
+      elsif (condition) = READ and (CNT_DATA) = "1000" and DIN = '1' then
+        condition <= STOP;
+        ST_WAIT <= '0';
+        ST_DATA <= '0';
           
-        elsif (condition) = READ and (CNT_DATA) = "1000" and DIN = '1' then
-          condition <= STOP;
-          ST_WAIT <= '0';
-          ST_DATA <= '0';
+      elsif (condition) = READ and (CNT_DATA) /= "1000" then 
+        condition <= READ;
+        ST_WAIT <= '1';
+        ST_DATA <= '1';
           
-        elsif (condition) = READ and (CNT_DATA) /= "1000" then 
-          condition <= READ;
-          ST_WAIT <= '1';
-          ST_DATA <= '1';
-          
-        elsif (condition) = STOP then  
-          condition <= START;
-          VLD_OUT <= '1';
-                
-        end if;  
-        
-      end if;
+      elsif (condition) = STOP then  
+        condition <= START;
+        VLD_OUT <= '1';                
+      end if;      
+    end if;
    end process;   
 end behavioral;

@@ -1,5 +1,5 @@
 -- uart.vhd: UART controller - receiving part
--- Author(s): Simona Jáno?íková xjanos19
+-- Author(s): Simona Janosikova (xjanos19)
 --
 library ieee;
 use ieee.std_logic_1164.all;
@@ -40,19 +40,24 @@ begin
   process(CLK,RST)
   begin
     if (RST = '1') then
-      cnt_read <= "00000";
-      cnt_data <= "0000";
       DOUT <= "00000000";
-    elsif (CLK'event) AND (CLK = '1') then
+      DOUT_VLD <= vld_out;
+      cnt_data <= "0000";
+      cnt_read <= "00000"; 
+    elsif (CLK'event AND CLK = '1') then
       if (cnt_read = "01000") and (st_data = '0') then   
-        cnt_read <= "00000"; 
-        cnt_data <= "0000";  
-        DOUT <= "00000000";          
-      elsif (st_wait = '1') then
+        DOUT <= "00000000";
+        cnt_data <= "0000";
+        cnt_read <= "00000";  
+      end if;    
+            
+      if (st_wait = '0') then
+        cnt_read <= "00000";
+      else
         cnt_read <= cnt_read + 1;
       end if;
 
-      if (st_data = '1') and (st_wait = '1') and (cnt_read = "10000") then
+      if (st_wait = '1') and (st_data = '1') and (cnt_read = "10000") then
         if (cnt_data = "0000") then
           DOUT(0) <= DIN;
         elsif (cnt_data = "0001") then
@@ -69,18 +74,18 @@ begin
           DOUT(6) <= DIN;
         elsif (cnt_data = "0111") then
           DOUT(7) <= DIN; 
-        end if;    
-        cnt_data <= cnt_data + '1';  
-        cnt_read <= "00000";               
-      end if;       
-
+        end if; 
+        cnt_read <= "00000";   
+        cnt_data <= cnt_data + '1';             
+      end if;
+          
       if (vld_out = '1') then
         cnt_data <= "0000";  
         cnt_read <= "00000";
+        DOUT_VLD <= vld_out;
       end if;           
          
       DOUT_VLD <= vld_out;
     end if;
-  end process;       
-   
+  end process; 
 end behavioral;

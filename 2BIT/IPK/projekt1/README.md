@@ -1,6 +1,6 @@
 # IPK-projekt1
 ## Autor 
-Simona Jánošíková (xjanos19)
+[Simona Jánošíková (xjanos19)](https://git.fit.vutbr.cz/xjanos19/IPK-projekt1)
 
 ## Zadanie projektu 
 Úlohou bolo naiplementovať klienta pre IPK Calculator Protocol. Klient by mal vedieť komunikovať pomocou TCP a UDP protokolu so serverom používajúcim IPKCP protokol.

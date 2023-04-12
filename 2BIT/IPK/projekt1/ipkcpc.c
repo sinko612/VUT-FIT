@@ -363,11 +363,11 @@ int main(int argc, char *argv[])
             // rozlisenie odpovede s chybou alebo s vysledkom
             if (stdinInpud[1] == 1)
             {
-                printf("ERR: %s\n", stdinInpud + 3);
+                printf("ERR:%s\n", stdinInpud + 3);
             }
             else if (stdinInpud[1] == 0)
             {
-                printf("OK: %s\n", stdinInpud + 3);
+                printf("OK:%s\n", stdinInpud + 3);
             }
             else
             {

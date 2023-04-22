@@ -1,0 +1,54 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage[text={17cm, 24cm}, left=2cm, top=3cm]{geometry}
+\usepackage{times}
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+\begin{titlepage}
+    \begin{center}
+       \textsc {\Huge{Vysoké učení technické v~Brně}\\
+                \huge{Fakulta informačních technologií}\\}
+        \vspace{\stretch{0.382}}
+        {\LARGE Typografie a~publikování\,--\,4. projekt\\[0.3em]}
+        {\Huge Bibliografické citace}
+        \vspace{\stretch{0.618}}
+    \end{center}
+    {\Large \today \hfill Simona Jánošíková}
+\end{titlepage}
+
+\section{\LaTeX}
+\LaTeX\:je typografickým nástrojom, ktorý je používaný po celom svete pre vedecké dokumenty, knihy a~tak isto pre ostatné formy publikácií viz \cite{OnlineOverleaf}. \LaTeX\:je nadstavbou pôvodného \TeX u, ktorý je značkovacím jazykom, umožňuje profesionálnu sadzbu dokumentov vo veľa jazykoch a~ich špeciálnu úpravu. \LaTeX\:ako nástroj je konkurenciou pre editory ako je napríklad MS Word alebo LibreOffice Writter. \cite{DiplPracSokol}
+
+\section{Ako vyzerá práca s \LaTeX om}
+Systém \LaTeX\:nie je WYSIWYG editor \cite{OnlineWyswing}, takže práca v~ňom pripomína skôr programovanie. Práca v \LaTeX e pozostáva z troch krokov, ako je uvedené v~\cite{KnihaRybicka}:
+\begin{enumerate}
+    \item písanie zdrojového textu,
+    \item preklad,
+    \item sledovanie výsledku.
+\end{enumerate}
+
+\section{Ako na \LaTeX}
+Exituje mnoho návodov, či už v tlačenej alebo elektronickej podobe, ako sa \LaTeX\:naučiť, avšak vždy záleží na preferencií človeka. Pre ľudí preferujúcich formu učenia z~kníh odporúčam českú knihu \uv{\emph{LaTeX pro začátečníky}} \cite{KnihaRybicka} alebo knihu v~anglickom jazyku \uv{\emph{Learning LaTeX}} \cite{KnihaLearningLatex} a~pre tých, čo preferujú učenie online odporúčam stránku Overleaf \footnote{Stránka Overleaf zemaraná na systém \LaTeX\:: \href{https://www.overleaf.com}{https://www.overleaf.com}}, ktorá poskytuje rôzne tutoriály a~dokumentáciu k \LaTeX u.
+
+\section{Výhody a~nevýhody \LaTeX u}
+Výhody používania \LaTeX u zhrnul vo svojom blogu Kryštof Davidek \cite{OnlineDavidek}. Za najdôležitejšiu výhodu sa považuje hlavne to, že výstupy \LaTeX u sú ako po estetickej, tak po typografickej stránke na profesionálnejšej úrovni, čo je zaistené tým, že pracuje so zložitejšími algoritmami. Nevýhodou \LaTeX u je potreba ho vedieť používať, respektíve sa ho naučiť, čo môže byť časovo náročné pre ľudí, ktorí potrebujú písať práce na profesionálnej úrovni, ako sú napríklad vedeckí pracovnici a~autori vedeckých prác \cite{DiplPracBartlik}.   
+
+\section{Matematické výrazy v \LaTeX e}
+Matematické výrazy ako jedna z~najsilnejších stránok \LaTeX u. Z~mojej skúsenosti z~používania matematického prostredia v~MS Word musím povedať, že práca s~matematickými výrazmi v~\LaTeX e je oveľa lepšia a~jednoduchšia. Matematickej sadzbe v~\LaTeX e je priradený znak doláru \$. \TeX\:tvorí vzorce v~skupine vo vnútornom matematickom móde \$~\dots~\$ alebo v~skupine v~display móde \$~\$~\dots~\$~\$~. V~oboch módoch sú pravidlá tvorby vzorcov rovnaké viz \cite{CasopisZpravodajOlsak}. Ďalším zaujímavým nástrojom pre písanie matematických vzorcov je písaný text na papier, ktorý je zachytený kamerou a~následne dochádza k~vygenerovaniu zdrojového kódu. Tejto problematike sa venujú viac viz \cite{ClanokSkanovanie}. Pre ďalšie naučenie sa pravidiel matematickej sadzby sú dobrým zdrojom \LaTeX\:manuály alebo \LaTeX\:dokumenty.
+
+\newpage
+\section{Sazda bibliografie v systéme \LaTeX}
+V~systéme \LaTeX\:sú k~dispozícii prakticky tri základné prístupy na sadzbu bibliografie.
+\begin{itemize}
+\item Čistý \LaTeX\: - poskytuje na sadzbu bibliografie vstavané prostredie \verb|thebibliography| a~rodinu makier \verb|\cite| umožňujúcich sadzbu bibliografických odkazov.
+\item  Bib\TeX\: - Preferovaným spôsobom práce s~bibliografiou pri sadzbe rozsiahlejších typov dokumentov je vytvorenie externej databázy bibliografických záznamov
+\item Bib\LaTeX\: - Inou možnosťou externého programu na sadzbu bibliografie je modernejší a~flexibilnejší \LaTeX ový balík Bib\LaTeX\:. Tento balíček je kompletnou reimplementáciou prostriedkov na prácu s~bibliografiou v~systéme \LaTeX . \cite{ClanokZpravodajLuptak}
+\end{itemize}
+
+\newpage
+	\bibliographystyle{czechiso}
+	\renewcommand{\refname}{Literatúra}
+	\bibliography{proj4}
+\end{document}
